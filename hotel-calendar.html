@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Disponibilidad</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f0e0c">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1a1917;
+    --surface2: #222120;
+    --border: #2e2c29;
+    --text: #e8e4dc;
+    --text-muted: #6b6760;
+    --free-bg: #0f1a13;
+    --free-text: #4ade80;
+    --reserved-bg: #1e1608;
+    --reserved-text: #fbbf24;
+    --occupied-bg: #1e0808;
+    --occupied-text: #f87171;
+    --accent: #c9a96e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .title-block h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    color: var(--accent);
+  }
+  .title-block p {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+  .header-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .nav-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 1rem;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .nav-btn:hover { border-color: var(--accent); }
+  #month-label {
+    font-size: 0.82rem;
+    color: var(--accent);
+    min-width: 130px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .sync-indicator {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .sync-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+  /* ── Main layout ── */
+  .main-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  /* ── Booking panel ── */
+  .booking-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 240px;
+    max-width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .panel-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .field label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .field input, .field select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 8px 10px;
+    border-radius: 6px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field input[type=date]::-webkit-calendar-picker-indicator {
+    filter: invert(0.5);
+    cursor: pointer;
+  }
+
+  .room-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .room-checkboxes::-webkit-scrollbar { width: 4px; }
+  .room-checkboxes::-webkit-scrollbar-track { background: var(--bg); }
+  .room-checkboxes::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .room-check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--text);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .room-check-item:hover { background: var(--surface2); }
+  .room-check-item input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 14px; height: 14px;
+    cursor: pointer;
+  }
+
+  .select-all-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .select-all-row button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .select-all-row button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .apply-btn {
+    background: var(--accent);
+    color: #0f0e0c;
+    border: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: opacity 0.2s;
+    width: 100%;
+  }
+  .apply-btn:hover { opacity: 0.85; }
+
+  .panel-msg {
+    font-size: 0.68rem;
+    text-align: center;
+    min-height: 16px;
+  }
+  .panel-msg.ok { color: var(--free-text); }
+  .panel-msg.err { color: var(--occupied-text); }
+
+  /* ── Table ── */
+  .table-section { flex: 1; overflow: hidden; }
+  .legend {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+  .dot-free { background: var(--free-text); }
+  .dot-reserved { background: var(--reserved-text); }
+  .dot-occupied { background: var(--occupied-text); }
+
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 500px; }
+
+  thead th {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 9px 5px;
+    font-size: 0.63rem;
+    font-weight: 500;
+    text-align: center;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  thead th.room-header {
+    color: var(--accent);
+    font-size: 0.7rem;
+    text-align: left;
+    padding-left: 14px;
+    min-width: 100px;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--surface);
+  }
+  thead th.weekend { color: var(--accent); opacity: 0.65; }
+  thead th.today-col { color: var(--text); border-bottom: 2px solid var(--accent); }
+
+  tbody tr:hover { background: rgba(255,255,255,0.018); }
+  tbody td {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+    text-align: center;
+    min-width: 32px;
+    height: 40px;
+    position: relative;
+  }
+  tbody td.room-name {
+    padding: 0 14px;
+    text-align: left;
+    font-size: 0.75rem;
+    color: var(--text);
+    white-space: nowrap;
+    position: sticky;
+    left: 0;
+    background: var(--bg);
+    z-index: 1;
+  }
+  td.today-col-cell {
+    border-left: 1px solid var(--accent);
+    border-right: 1px solid var(--accent);
+  }
+
+  .cell-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.62rem;
+    font-weight: 500;
+    cursor: default;
+    transition: filter 0.12s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cell-inner:hover { filter: brightness(1.3); }
+  .cell-inner:active { filter: brightness(1.6); }
+  .cell-inner.free { background: var(--free-bg); color: var(--free-text); }
+  .cell-inner.reserved { background: var(--reserved-bg); color: var(--reserved-text); }
+  .cell-inner.occupied { background: var(--occupied-bg); color: var(--occupied-text); }
+
+  .status-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 130px;
+    flex: 1;
+  }
+  .stat-card-label {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .stat-card-value {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .stat-card-value.green  { color: var(--free-text); }
+  .stat-card-value.yellow { color: var(--reserved-text); }
+  .stat-card-value.red    { color: var(--occupied-text); }
+  .stat-card-sub {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 2px;
+  }
+  .stat-card-sub span { color: var(--text); }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 8px 14px;
+    border-radius: 8px;
+    pointer-events: none;
+    display: none;
+    z-index: 500;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+    white-space: nowrap;
+  }
+  #tooltip .tip-status { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+  #tooltip .tip-status.reserved { color: var(--reserved-text); }
+  #tooltip .tip-status.occupied { color: var(--occupied-text); }
+  #tooltip .tip-guest { color: var(--accent); }
+  #tooltip .tip-dates { font-size: 0.62rem; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── Context menu ── */
+  #ctx-menu {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 0;
+    z-index: 1000;
+    display: none;
+    min-width: 210px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+  }
+  #ctx-menu .ctx-header {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 14px 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  #ctx-menu button {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.73rem;
+    padding: 8px 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  #ctx-menu button:hover { background: var(--border); }
+  #ctx-menu .ctx-reset { color: var(--free-text); }
+  #ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+  /* ── PIN lock screen ── */
+  #pin-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    flex-direction: column;
+    gap: 28px;
+  }
+  #pin-screen.hidden { display: none; }
+  .pin-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: 320px;
+  }
+  .pin-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    color: var(--accent);
+    text-align: center;
+  }
+  .pin-logo span {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 4px;
+  }
+  .pin-dots {
+    display: flex;
+    gap: 14px;
+  }
+  .pin-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .pin-dot.filled {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .pin-dot.error {
+    background: var(--occupied-text);
+    border-color: var(--occupied-text);
+    animation: shake 0.35s ease;
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%      { transform: translateX(-6px); }
+    60%      { transform: translateX(6px); }
+    80%      { transform: translateX(-3px); }
+  }
+  .pin-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+  }
+  .pin-key {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 1.1rem;
+    padding: 16px 0;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .pin-key:hover  { background: var(--border); border-color: var(--accent); }
+  .pin-key:active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .pin-key.del    { color: var(--text-muted); font-size: 0.9rem; }
+  .pin-key.zero   { grid-column: 2; }
+  .pin-error-msg {
+    font-size: 0.68rem;
+    color: var(--occupied-text);
+    min-height: 1em;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- PIN lock screen -->
+<div id="pin-screen">
+  <div class="pin-card">
+    <div class="pin-logo">Disponibilidad<span>Acceso con PIN</span></div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="pin-keypad">
+      <button class="pin-key" onclick="pinPress('1')">1</button>
+      <button class="pin-key" onclick="pinPress('2')">2</button>
+      <button class="pin-key" onclick="pinPress('3')">3</button>
+      <button class="pin-key" onclick="pinPress('4')">4</button>
+      <button class="pin-key" onclick="pinPress('5')">5</button>
+      <button class="pin-key" onclick="pinPress('6')">6</button>
+      <button class="pin-key" onclick="pinPress('7')">7</button>
+      <button class="pin-key" onclick="pinPress('8')">8</button>
+      <button class="pin-key" onclick="pinPress('9')">9</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button>
+      <button class="pin-key zero" onclick="pinPress('0')">0</button>
+    </div>
+    <div class="pin-error-msg" id="pin-error"></div>
+  </div>
+</div>
+
+<!-- App (oculta hasta PIN correcto) -->
+<div id="app-content" style="display:none; flex-direction:column; gap:20px; flex:1">
+
+<header>
+  <div class="title-block">
+    <h1>Disponibilidad</h1>
+    <p>Panel de habitaciones · Colaborativo</p>
+  </div>
+  <div class="header-right">
+    <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
+    <span id="month-label"></span>
+    <button class="nav-btn" onclick="changeMonth(1)">›</button>
+    <div class="sync-indicator">
+      <div class="sync-dot"></div>
+      <span id="sync-text">Conectando...</span>
+    </div>
+    <button class="nav-btn" onclick="sessionStorage.removeItem('pin_ok'); location.reload()" title="Cerrar sesión" style="font-size:0.7rem; padding:5px 10px; color:var(--text-muted)">🔒</button>
+  </div>
+</header>
+
+<div class="main-layout">
+
+  <!-- Booking panel -->
+  <div class="booking-panel">
+    <div class="panel-title">Nueva asignación</div>
+
+    <div class="field">
+      <label>Habitaciones</label>
+      <div class="select-all-row">
+        <button onclick="selectAllRooms(true)">Todas</button>
+        <button onclick="selectAllRooms(false)">Ninguna</button>
+      </div>
+      <div class="room-checkboxes" id="room-checkboxes"></div>
+    </div>
+
+    <div class="field">
+      <label>Fecha de entrada</label>
+      <input type="date" id="date-from">
+    </div>
+
+    <div class="field">
+      <label>Fecha de salida</label>
+      <input type="date" id="date-to">
+    </div>
+
+    <div class="field">
+      <label>Estado</label>
+      <select id="panel-status">
+        <option value="free">⬤  Libre</option>
+        <option value="reserved">⬤  Reservada</option>
+        <option value="occupied" selected>⬤  Ocupada</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Nombre del huésped <span style="color:var(--text-muted)">(opcional)</span></label>
+      <input type="text" id="guest-name" placeholder="Ej: Juan García">
+    </div>
+
+    <button class="apply-btn" onclick="applyBooking()">Aplicar</button>
+    <div class="panel-msg" id="panel-msg"></div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="table-section">
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot dot-free"></div> Libre</div>
+      <div class="legend-item"><div class="legend-dot dot-reserved"></div> Reservada</div>
+      <div class="legend-item"><div class="legend-dot dot-occupied"></div> Ocupada</div>
+      <div style="margin-left:auto; font-size:0.63rem; color:var(--text-muted);">Hover: ver huésped · Clic derecho: opciones</div>
+    </div>
+    <div class="table-wrap">
+      <table id="main-table">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="status-bar" id="status-bar"></div>
+  </div>
+</div>
+
+</div><!-- /app-content -->
+<div id="tooltip">
+  <div class="tip-status" id="tip-status"></div>
+  <div class="tip-guest" id="tip-guest"></div>
+</div>
+
+<!-- Context menu -->
+<div id="ctx-menu">
+  <div class="ctx-header" id="ctx-header">—</div>
+  <button class="ctx-reset" onclick="ctxResetRange()">↺ Restablecer rango a Libre</button>
+  <hr>
+  <button onclick="ctxResetCell()">Limpiar solo este día</button>
+</div>
+
+<script>
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DAYS_SHORT = ['D','L','M','X','J','V','S'];
+const STATUS_LABELS = { free: '', reserved: 'R', occupied: 'O' };
+
+let viewYear, viewMonth;
+let rooms = [];
+let calData = {};
+let ctxTarget = null;
+
+// ── Supabase ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://cqyxgzdpjmnyeoqwalsd.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_94VuSYiA-P1To3NBg0BGMw_nJZoy5sK';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function defaultRooms() {
+  return ['101','102','103','104','105','201','202','203','204','205'];
+}
+
+// Carga todos los datos del mes visible desde Supabase
+async function loadFromStorage() {
+  setSyncDot('loading');
+  try {
+    const { data, error } = await sb
+      .from('reservas')
+      .select('*');
+    if (error) throw error;
+
+    calData = {};
+    (data || []).forEach(row => {
+      const key = cellKey(row.room, row.year, row.month, row.day);
+      calData[key] = { status: row.status, guest: row.guest || '' };
+    });
+    rooms = defaultRooms();
+    setSyncDot('ok');
+  } catch(e) {
+    console.warn('load failed', e);
+    rooms = defaultRooms();
+    calData = {};
+    setSyncDot('err');
+  }
+}
+
+// ── Cell data ────────────────────────────────────────────────────────────────
+function cellKey(room, year, month, day) { return `${room}__${year}_${month}_${day}`; }
+function getCell(room, day) {
+  return calData[cellKey(room, viewYear, viewMonth, day)] || { status: 'free', guest: '' };
+}
+
+async function setCell(room, day, status, guest) {
+  const key = cellKey(room, viewYear, viewMonth, day);
+  if (status === 'free' && !guest) {
+    delete calData[key];
+    await sb.from('reservas').delete().match({ room, year: viewYear, month: viewMonth, day });
+  } else {
+    calData[key] = { status, guest: guest || '' };
+    await sb.from('reservas').upsert(
+      { room, year: viewYear, month: viewMonth, day, status, guest: guest || '' },
+      { onConflict: 'room,year,month,day' }
+    );
+  }
+  setSyncDot('ok');
+}
+
+function daysInMonth(y, m) { return new Date(y, m+1, 0).getDate(); }
+function dayOfWeek(y, m, d) { return new Date(y, m, d).getDay(); }
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const days = daysInMonth(viewYear, viewMonth);
+  const today = new Date();
+  const isCurMonth = today.getFullYear() === viewYear && today.getMonth() === viewMonth;
+  const todayDay = today.getDate();
+
+  document.getElementById('month-label').textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+
+  // Header
+  const thead = document.getElementById('thead');
+  thead.innerHTML = '';
+  const tr = document.createElement('tr');
+  let th = document.createElement('th');
+  th.className = 'room-header';
+  th.textContent = 'Habitación';
+  tr.appendChild(th);
+  for (let d = 1; d <= days; d++) {
+    th = document.createElement('th');
+    const dow = dayOfWeek(viewYear, viewMonth, d);
+    th.innerHTML = `${DAYS_SHORT[dow]}<br><strong>${d}</strong>`;
+    if (dow === 0 || dow === 6) th.classList.add('weekend');
+    if (isCurMonth && d === todayDay) th.classList.add('today-col');
+    tr.appendChild(th);
+  }
+  thead.appendChild(tr);
+
+  // Body
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  rooms.forEach(room => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.className = 'room-name';
+    nameTd.textContent = `Hab. ${room}`;
+    tr.appendChild(nameTd);
+
+    for (let d = 1; d <= days; d++) {
+      const td = document.createElement('td');
+      td.dataset.room = room;
+      td.dataset.day = d;
+      if (isCurMonth && d === todayDay) td.classList.add('today-col-cell');
+
+      const inner = document.createElement('div');
+      const cell = getCell(room, d);
+      inner.className = `cell-inner ${cell.status}`;
+      inner.textContent = STATUS_LABELS[cell.status];
+
+      inner.addEventListener('mouseenter', (e) => showTooltip(e, room, d));
+      inner.addEventListener('mousemove', moveTooltip);
+      inner.addEventListener('mouseleave', hideTooltip);
+      inner.addEventListener('contextmenu', (e) => { e.preventDefault(); openCtx(e, room, d); });
+
+      td.appendChild(inner);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  });
+
+  renderRoomCheckboxes();
+  updateStats();
+}
+
+function refreshCell(room, day) {
+  const td = document.querySelector(`td[data-room="${room}"][data-day="${day}"]`);
+  if (!td) return;
+  const cell = getCell(room, day);
+  const inner = td.querySelector('.cell-inner');
+  inner.className = `cell-inner ${cell.status}`;
+  inner.textContent = STATUS_LABELS[cell.status];
+}
+
+function updateStats() {
+  const hoy    = new Date();
+  const todayY = hoy.getFullYear();
+  const todayM = hoy.getMonth();
+  const todayD = hoy.getDate();
+
+  // ── Habitaciones ocupadas hoy ────────────────────────────────────────────
+  let ocupadasHoy = 0;
+  const ocupadasNombres = [];
+  rooms.forEach(room => {
+    const c = calData[cellKey(room, todayY, todayM, todayD)];
+    if (c && c.status === 'occupied') {
+      ocupadasHoy++;
+      ocupadasNombres.push({ room, guest: c.guest });
+    }
+  });
+
+  // ── Llegadas hoy (reservada ayer → ocupada hoy, o libre→ocupada hoy) ────
+  // Definición práctica: habitaciones que HOY están ocupadas pero AYER no lo estaban
+  const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
+  const ayerY = ayer.getFullYear(), ayerM = ayer.getMonth(), ayerD = ayer.getDate();
+
+  let llegadas = 0;
+  const llegadasList = [];
+  rooms.forEach(room => {
+    const hoyCell  = calData[cellKey(room, todayY, todayM, todayD)];
+    const ayerCell = calData[cellKey(room, ayerY,  ayerM,  ayerD)];
+    const hoyOc  = hoyCell  && (hoyCell.status  === 'occupied' || hoyCell.status  === 'reserved');
+    const ayerOc = ayerCell && (ayerCell.status === 'occupied' || ayerCell.status === 'reserved');
+    if (hoyOc && !ayerOc) {
+      llegadas++;
+      llegadasList.push({ room, guest: hoyCell.guest });
+    }
+  });
+
+  // ── Salidas hoy (ocupada hoy → libre mañana) ────────────────────────────
+  let salidas = 0;
+  const salidasList = [];
+  const manana = new Date(hoy); manana.setDate(manana.getDate() + 1);
+  const mananaY = manana.getFullYear(), mananaM = manana.getMonth(), mananaD = manana.getDate();
+
+  rooms.forEach(room => {
+    const hoyCell    = calData[cellKey(room, todayY, todayM, todayD)];
+    const mananaCell = calData[cellKey(room, mananaY, mananaM, mananaD)];
+    const hoyOc      = hoyCell    && (hoyCell.status    === 'occupied' || hoyCell.status    === 'reserved');
+    const mananaLibre = !mananaCell || mananaCell.status === 'free';
+    if (hoyOc && mananaLibre) {
+      salidas++;
+      salidasList.push({ room, guest: hoyCell.guest });
+    }
+  });
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  const fmt = list => list.length
+    ? list.map(x => `Hab. ${x.room}${x.guest ? ` · <span>${x.guest}</span>` : ''}`).join('<br>')
+    : '<span style="color:var(--text-muted)">—</span>';
+
+  document.getElementById('status-bar').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card-label">Ocupadas hoy</div>
+      <div class="stat-card-value ${ocupadasHoy > 0 ? 'red' : 'green'}">${ocupadasHoy} / ${rooms.length}</div>
+      <div class="stat-card-sub">${fmt(ocupadasNombres)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Llegadas hoy</div>
+      <div class="stat-card-value ${llegadas > 0 ? 'yellow' : ''}">${llegadas}</div>
+      <div class="stat-card-sub">${fmt(llegadasList)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Salidas hoy</div>
+      <div class="stat-card-value ${salidas > 0 ? 'yellow' : ''}">${salidas}</div>
+      <div class="stat-card-sub">${fmt(salidasList)}</div>
+    </div>
+  `;
+}
+
+// ── Room checkboxes ──────────────────────────────────────────────────────────
+function renderRoomCheckboxes() {
+  const container = document.getElementById('room-checkboxes');
+  const prev = getCheckedRooms();
+  container.innerHTML = '';
+  rooms.forEach(room => {
+    const label = document.createElement('label');
+    label.className = 'room-check-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = room;
+    cb.checked = prev.includes(room);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(`Hab. ${room}`));
+    container.appendChild(label);
+  });
+}
+function getCheckedRooms() {
+  return Array.from(document.querySelectorAll('#room-checkboxes input:checked')).map(cb => cb.value);
+}
+function selectAllRooms(val) {
+  document.querySelectorAll('#room-checkboxes input[type=checkbox]').forEach(cb => cb.checked = val);
+}
+
+// ── Booking panel ────────────────────────────────────────────────────────────
+async function applyBooking() {
+  const selectedRooms = getCheckedRooms();
+  const dateFrom = document.getElementById('date-from').value;
+  const dateTo   = document.getElementById('date-to').value;
+  const status   = document.getElementById('panel-status').value;
+  const guest    = document.getElementById('guest-name').value.trim();
+
+  if (!selectedRooms.length) { showMsg('Selecciona al menos una habitación.', 'err'); return; }
+  if (!dateFrom || !dateTo)  { showMsg('Selecciona un rango de fechas.', 'err'); return; }
+  if (dateFrom > dateTo)     { showMsg('La entrada debe ser antes de la salida.', 'err'); return; }
+
+  showMsg('Guardando...', 'ok');
+  setSyncDot('loading');
+
+  const from = new Date(dateFrom + 'T00:00:00');
+  const to   = new Date(dateTo   + 'T00:00:00');
+  const toUpsert = [], toDeleteKeys = [];
+
+  for (let dt = new Date(from); dt <= to; dt.setDate(dt.getDate() + 1)) {
+    const y = dt.getFullYear(), m = dt.getMonth(), d = dt.getDate();
+    selectedRooms.forEach(room => {
+      const key = cellKey(room, y, m, d);
+      if (status === 'free' && !guest) {
+        delete calData[key];
+        toDeleteKeys.push({ room, year: y, month: m, day: d });
+      } else {
+        calData[key] = { status, guest: guest || '' };
+        toUpsert.push({ room, year: y, month: m, day: d, status, guest: guest || '' });
+      }
+      if (y === viewYear && m === viewMonth) refreshCell(room, d);
+    });
+  }
+
+  try {
+    if (toUpsert.length) {
+      const { error } = await sb.from('reservas').upsert(toUpsert, { onConflict: 'room,year,month,day' });
+      if (error) throw error;
+    }
+    for (const r of toDeleteKeys) {
+      await sb.from('reservas').delete().match({ room: r.room, year: r.year, month: r.month, day: r.day });
+    }
+    setSyncDot('ok');
+    updateStats();
+    showMsg(`✓ ${toUpsert.length + toDeleteKeys.length} celda(s) guardadas.`, 'ok');
+    // Limpiar formulario
+    document.getElementById('guest-name').value = '';
+    document.getElementById('panel-status').value = 'occupied';
+    selectAllRooms(false);
+    syncDates();
+  } catch(e) {
+    console.error(e);
+    setSyncDot('err');
+    showMsg('Error al guardar. Revisa la conexión.', 'err');
+  }
+}
+
+function showMsg(text, type) {
+  const el = document.getElementById('panel-msg');
+  el.textContent = text;
+  el.className = `panel-msg ${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ''; el.className = 'panel-msg'; }, 3500);
+}
+
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+let tooltipVisible = false;
+
+function showTooltip(e, room, day) {
+  const cell = getCell(room, day);
+  if (cell.status === 'free') { hideTooltip(); return; }
+  document.getElementById('tip-status').textContent = cell.status === 'reserved' ? 'Reservada' : 'Ocupada';
+  document.getElementById('tip-status').className = `tip-status ${cell.status}`;
+  document.getElementById('tip-guest').textContent = cell.guest ? `👤 ${cell.guest}` : 'Sin nombre de huésped';
+  tooltip.style.display = 'block';
+  tooltipVisible = true;
+  positionTooltip(e);
+}
+function moveTooltip(e) { if (tooltipVisible) positionTooltip(e); }
+function hideTooltip() { tooltip.style.display = 'none'; tooltipVisible = false; }
+function positionTooltip(e) {
+  let x = e.clientX + 16, y = e.clientY + 16;
+  if (x + 220 > window.innerWidth)  x = e.clientX - 230;
+  if (y + 70  > window.innerHeight) y = e.clientY - 70;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+
+// ── Context menu ─────────────────────────────────────────────────────────────
+const ctxMenu = document.getElementById('ctx-menu');
+
+function openCtx(e, room, day) {
+  hideTooltip();
+  ctxTarget = { room, day };
+  document.getElementById('ctx-header').textContent = `Hab. ${room} — Día ${day}`;
+  ctxMenu.style.display = 'block';
+  const x = Math.min(e.clientX, window.innerWidth - 230);
+  const y = Math.min(e.clientY, window.innerHeight - 130);
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top  = y + 'px';
+}
+function closeCtx() { ctxMenu.style.display = 'none'; }
+
+// Restablecer el bloque contiguo (mismo huésped + estado) a Libre
+async function ctxResetRange() {
+  if (!ctxTarget) return;
+  const { room, day } = ctxTarget;
+  const cell = getCell(room, day);
+  if (cell.status === 'free') { closeCtx(); return; }
+  const { status, guest } = cell;
+  const days = daysInMonth(viewYear, viewMonth);
+
+  let start = day, end = day;
+  while (start > 1 && (() => { const c = getCell(room, start-1); return c.status===status && c.guest===guest; })()) start--;
+  while (end < days && (() => { const c = getCell(room, end+1);  return c.status===status && c.guest===guest; })()) end++;
+
+  for (let d = start; d <= end; d++) {
+    const key = cellKey(room, viewYear, viewMonth, d);
+    delete calData[key];
+    refreshCell(room, d);
+  }
+  updateStats();
+  closeCtx();
+
+  // Batch delete from Supabase
+  for (let d = start; d <= end; d++) {
+    await sb.from('reservas').delete().match({ room, year: viewYear, month: viewMonth, day: d });
+  }
+  setSyncDot('ok');
+}
+
+async function ctxResetCell() {
+  if (!ctxTarget) return;
+  const { room, day } = ctxTarget;
+  const key = cellKey(room, viewYear, viewMonth, day);
+  delete calData[key];
+  refreshCell(room, day);
+  updateStats();
+  closeCtx();
+  await sb.from('reservas').delete().match({ room, year: viewYear, month: viewMonth, day });
+  setSyncDot('ok');
+}
+
+document.addEventListener('click', (e) => { if (!ctxMenu.contains(e.target)) closeCtx(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCtx(); });
+
+// ── Sync dot feedback ────────────────────────────────────────────────────────
+function setSyncDot(state) {
+  const dot = document.querySelector('.sync-dot');
+  const txt = document.getElementById('sync-text');
+  if (state === 'loading') {
+    dot.style.background = '#fbbf24';
+    txt.textContent = 'Guardando...';
+  } else if (state === 'ok') {
+    dot.style.background = '#4ade80';
+    txt.textContent = 'Guardado ✓';
+    setTimeout(() => { txt.textContent = 'Conectado'; }, 2000);
+  } else {
+    dot.style.background = '#f87171';
+    txt.textContent = 'Sin conexión';
+  }
+}
+
+// ── Month nav ────────────────────────────────────────────────────────────────
+function changeMonth(delta) {
+  viewMonth += delta;
+  if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  if (viewMonth < 0)  { viewMonth = 11; viewYear--; }
+  syncDates();
+  render();
+}
+
+function syncDates() {
+  const pad = n => String(n).padStart(2,'0');
+  const days = daysInMonth(viewYear, viewMonth);
+  document.getElementById('date-from').value = `${viewYear}-${pad(viewMonth+1)}-01`;
+  document.getElementById('date-to').value   = `${viewYear}-${pad(viewMonth+1)}-${pad(days)}`;
+}
+
+// ── PIN (verificado contra hash en Supabase) ──────────────────────────────────
+const PIN_LENGTH = 4;
+let pinBuffer = '';
+let pinHashRemote = null; // Se carga al iniciar
+
+async function loadPinHash() {
+  try {
+    const { data, error } = await sb
+      .from('config')
+      .select('value')
+      .eq('key', 'pin_hash')
+      .single();
+    if (error || !data) throw new Error('No se encontró el PIN en la base de datos');
+    pinHashRemote = data.value;
+  } catch(e) {
+    document.getElementById('pin-error').textContent = 'Error al cargar configuración';
+    console.error(e);
+  }
+}
+
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function pinPress(digit) {
+  if (pinBuffer.length >= PIN_LENGTH) return;
+  pinBuffer += digit;
+  updatePinDots();
+  if (pinBuffer.length === PIN_LENGTH) {
+    setTimeout(checkPin, 120);
+  }
+}
+
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function updatePinDots() {
+  for (let i = 0; i < PIN_LENGTH; i++) {
+    const dot = document.getElementById('d' + i);
+    dot.classList.toggle('filled', i < pinBuffer.length);
+    dot.classList.remove('error');
+  }
+}
+
+async function checkPin() {
+  if (!pinHashRemote) {
+    document.getElementById('pin-error').textContent = 'Configuración no cargada, recarga la página';
+    pinBuffer = '';
+    updatePinDots();
+    return;
+  }
+  const inputHash = await sha256hex(pinBuffer);
+  if (inputHash === pinHashRemote) {
+    sessionStorage.setItem('pin_ok', pinHashRemote); // guardamos el hash, no el PIN
+    unlockApp();
+  } else {
+    for (let i = 0; i < PIN_LENGTH; i++) {
+      document.getElementById('d' + i).classList.add('error');
+    }
+    document.getElementById('pin-error').textContent = 'PIN incorrecto';
+    setTimeout(() => {
+      pinBuffer = '';
+      updatePinDots();
+      document.getElementById('pin-error').textContent = '';
+    }, 800);
+  }
+}
+
+function unlockApp() {
+  document.getElementById('pin-screen').classList.add('hidden');
+  const app = document.getElementById('app-content');
+  app.style.display = 'flex';
+}
+
+// Teclado físico para el PIN
+document.addEventListener('keydown', e => {
+  if (document.getElementById('pin-screen').classList.contains('hidden')) return;
+  if (e.key >= '0' && e.key <= '9') pinPress(e.key);
+  if (e.key === 'Backspace') pinDel();
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+(async function init() {
+  // Cargar hash del PIN desde Supabase (siempre, para tenerlo listo)
+  await loadPinHash();
+
+  // Si la sesión ya tiene el hash correcto, entrar directo
+  if (pinHashRemote && sessionStorage.getItem('pin_ok') === pinHashRemote) {
+    unlockApp();
+  }
+
+  // Cargar datos del calendario en paralelo
+  const hoy = new Date();
+  viewYear  = hoy.getFullYear();
+  viewMonth = hoy.getMonth();
+  await loadFromStorage();
+  syncDates();
+  render();
+
+  // Realtime: escuchar cambios de otros usuarios
+  sb.channel('reservas-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, payload => {
+      const row = payload.new || payload.old;
+      if (!row) return;
+      const key = cellKey(row.room, row.year, row.month, row.day);
+      if (payload.eventType === 'DELETE') {
+        delete calData[key];
+      } else {
+        calData[key] = { status: row.status, guest: row.guest || '' };
+      }
+      if (row.year === viewYear && row.month === viewMonth) {
+        refreshCell(row.room, row.day);
+        updateStats();
+      }
+    })
+    .subscribe();
+})();
+</script>
+</body>
+</html>
