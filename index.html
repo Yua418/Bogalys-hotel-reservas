@@ -645,6 +645,8 @@
 <!-- Context menu -->
 <div id="ctx-menu">
   <div class="ctx-header" id="ctx-header">—</div>
+  <button style="color:var(--occupied-text)" onclick="ctxConvertRange('occupied')">⬤ Marcar rango como Ocupada</button>
+  <button style="color:var(--reserved-text)" onclick="ctxConvertRange('reserved')">⬤ Marcar rango como Reservada</button>
   <button class="ctx-reset" onclick="ctxResetRange()">↺ Restablecer rango a Libre</button>
   <hr>
   <button onclick="ctxResetCell()">Limpiar solo este día</button>
@@ -992,6 +994,34 @@ function openCtx(e, room, day) {
   ctxMenu.style.top  = y + 'px';
 }
 function closeCtx() { ctxMenu.style.display = 'none'; }
+
+// Convertir rango contiguo a un nuevo estado
+async function ctxConvertRange(newStatus) {
+  if (!ctxTarget) return;
+  const { room, day } = ctxTarget;
+  const cell = getCell(room, day);
+  if (cell.status === 'free') { closeCtx(); return; }
+  const { status, guest } = cell;
+  const days = daysInMonth(viewYear, viewMonth);
+
+  let start = day, end = day;
+  while (start > 1 && (() => { const c = getCell(room, start-1); return c.status===status && c.guest===guest; })()) start--;
+  while (end < days && (() => { const c = getCell(room, end+1);  return c.status===status && c.guest===guest; })()) end++;
+
+  const toUpsert = [];
+  for (let d = start; d <= end; d++) {
+    const key = cellKey(room, viewYear, viewMonth, d);
+    calData[key] = { status: newStatus, guest: guest || '' };
+    toUpsert.push({ room, year: viewYear, month: viewMonth, day: d, status: newStatus, guest: guest || '' });
+    refreshCell(room, d);
+  }
+  updateStats();
+  closeCtx();
+
+  const { error } = await sb.from('reservas').upsert(toUpsert, { onConflict: 'room,year,month,day' });
+  if (error) console.error(error);
+  setSyncDot('ok');
+}
 
 // Restablecer el bloque contiguo (mismo huésped + estado) a Libre
 async function ctxResetRange() {
